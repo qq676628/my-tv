@@ -5,12 +5,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.DialogFragment
-import com.lizongying.mytv.databinding.DialogBinding
+import com.lizongying.mytv.databinding.SettingBinding
 
 
 class SettingFragment : DialogFragment() {
 
-    private var _binding: DialogBinding? = null
+    private var _binding: SettingBinding? = null
     private val binding get() = _binding!!
 
     private lateinit var updateManager: UpdateManager
@@ -26,7 +26,7 @@ class SettingFragment : DialogFragment() {
         savedInstanceState: Bundle?
     ): View {
         val context = requireContext() // It‘s safe to get context here.
-        _binding = DialogBinding.inflate(inflater, container, false)
+        _binding = SettingBinding.inflate(inflater, container, false)
         binding.versionName.text = "当前版本: v${context.appVersionName}"
         binding.version.text = "https://github.com/lizongying/my-tv"
 
@@ -34,7 +34,7 @@ class SettingFragment : DialogFragment() {
             isChecked = SP.channelReversal
             setOnCheckedChangeListener { _, isChecked ->
                 SP.channelReversal = isChecked
-                (activity as MainActivity).settingActive()
+                (activity as MainActivity).settingDelayHide()
             }
         }
 
@@ -42,7 +42,7 @@ class SettingFragment : DialogFragment() {
             isChecked = SP.channelNum
             setOnCheckedChangeListener { _, isChecked ->
                 SP.channelNum = isChecked
-                (activity as MainActivity).settingActive()
+                (activity as MainActivity).settingDelayHide()
             }
         }
 
@@ -50,23 +50,34 @@ class SettingFragment : DialogFragment() {
             isChecked = SP.bootStartup
             setOnCheckedChangeListener { _, isChecked ->
                 SP.bootStartup = isChecked
-                (activity as MainActivity).settingActive()
+                (activity as MainActivity).settingDelayHide()
             }
         }
 
         updateManager = UpdateManager(context, this, context.appVersionCode)
-        binding.checkVersion.setOnClickListener(OnClickListenerCheckVersion(updateManager))
+        binding.checkVersion.setOnClickListener(
+            OnClickListenerCheckVersion(
+                activity as MainActivity,
+                updateManager
+            )
+        )
 
         return binding.root
     }
 
     fun setVersionName(versionName: String) {
-        binding.versionName.text = versionName
+        if (_binding != null) {
+            binding.versionName.text = versionName
+        }
     }
 
-    internal class OnClickListenerCheckVersion(private val updateManager: UpdateManager) :
+    internal class OnClickListenerCheckVersion(
+        private val mainActivity: MainActivity,
+        private val updateManager: UpdateManager
+    ) :
         View.OnClickListener {
         override fun onClick(view: View?) {
+            mainActivity.settingDelayHide()
             updateManager.checkAndUpdate()
         }
     }
@@ -74,11 +85,6 @@ class SettingFragment : DialogFragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-//        updateManager.destroy()
     }
 
     companion object {

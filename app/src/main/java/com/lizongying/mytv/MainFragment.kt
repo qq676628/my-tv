@@ -1,9 +1,10 @@
 package com.lizongying.mytv
 
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.leanback.app.BrowseSupportFragment
 import androidx.leanback.widget.ArrayObjectAdapter
@@ -17,8 +18,8 @@ import androidx.leanback.widget.Presenter
 import androidx.leanback.widget.Row
 import androidx.leanback.widget.RowPresenter
 import androidx.lifecycle.lifecycleScope
-import com.lizongying.mytv.Utils.getDateTimestamp
 import com.lizongying.mytv.api.YSP
+import com.lizongying.mytv.models.ProgramType
 import com.lizongying.mytv.models.TVListViewModel
 import com.lizongying.mytv.models.TVViewModel
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,29 @@ class MainFragment : BrowseSupportFragment() {
         headersState = HEADERS_DISABLED
     }
 
+//    override fun onCreateView(
+//        inflater: LayoutInflater,
+//        container: ViewGroup?,
+//        savedInstanceState: Bundle?
+//    ): View? {
+//        val rootView = super.onCreateView(inflater, container, savedInstanceState)
+//        rootView?.setOnClickListener {
+//            Log.i(TAG, "main on click")
+//            fragmentManager!!.beginTransaction().hide(this).commit()
+//        }
+//        mainFragment.view?.setOnClickListener {
+//            Log.i(TAG, "mainFragment on click")
+//            fragmentManager!!.beginTransaction().hide(this).commit()
+//        }
+//        getRowsSupportFragment().view?.setOnClickListener {
+//            Log.i(TAG, "getRowsSupportFragment on click")
+//            fragmentManager!!.beginTransaction().hide(this).commit()
+//        }
+//
+//
+//        return rootView
+//    }
+
     override fun onStart() {
         Log.i(TAG, "onStart")
         super.onStart()
@@ -57,7 +81,7 @@ class MainFragment : BrowseSupportFragment() {
         tvListViewModel.tvListViewModel.value?.forEach { tvViewModel ->
             tvViewModel.errInfo.observe(viewLifecycleOwner) { _ ->
                 if (tvViewModel.errInfo.value != null
-                    && tvViewModel.id.value == itemPosition
+                    && tvViewModel.getTV().id == itemPosition
                 ) {
                     Toast.makeText(context, tvViewModel.errInfo.value, Toast.LENGTH_SHORT).show()
                 }
@@ -66,18 +90,18 @@ class MainFragment : BrowseSupportFragment() {
 
                 // not first time && channel not change
                 if (tvViewModel.ready.value != null
-                    && tvViewModel.id.value == itemPosition
+                    && tvViewModel.getTV().id == itemPosition
                     && check(tvViewModel)
                 ) {
-                    Log.i(TAG, "ready ${tvViewModel.title.value}")
+                    Log.i(TAG, "ready ${tvViewModel.getTV().title}")
                     (activity as? MainActivity)?.play(tvViewModel)
                 }
             }
             tvViewModel.change.observe(viewLifecycleOwner) { _ ->
                 if (tvViewModel.change.value != null) {
-                    val title = tvViewModel.title.value
+                    val title = tvViewModel.getTV().title
                     Log.i(TAG, "switch $title")
-                    if (tvViewModel.pid.value != "") {
+                    if (tvViewModel.getTV().pid != "") {
                         Log.i(TAG, "request $title")
                         lifecycleScope.launch(Dispatchers.IO) {
                             tvViewModel.let { Request.fetchData(it) }
@@ -124,7 +148,7 @@ class MainFragment : BrowseSupportFragment() {
     private fun loadRows() {
         rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
 
-        val cardPresenter = CardPresenter(viewLifecycleOwner)
+        val cardPresenter = CardPresenter(context!!)
 
         var idx: Long = 0
         for ((k, v) in TVList.list) {
@@ -135,8 +159,6 @@ class MainFragment : BrowseSupportFragment() {
                 tvViewModel.setItemPosition(idx2)
                 tvListViewModel.addTVViewModel(tvViewModel)
                 listRowAdapter.add(tvViewModel)
-
-                updateEPG(tvViewModel)
             }
             tvListViewModel.maxNum.add(v.size)
             val header = HeaderItem(idx, k)
@@ -196,8 +218,8 @@ class MainFragment : BrowseSupportFragment() {
             row: Row
         ) {
             if (item is TVViewModel) {
-                if (itemPosition != item.id.value!!) {
-                    itemPosition = item.id.value!!
+                if (itemPosition != item.getTV().id) {
+                    itemPosition = item.getTV().id
                     tvListViewModel.setItemPosition(itemPosition)
                     tvListViewModel.getTVViewModel(itemPosition)?.changed()
                 }
@@ -212,14 +234,14 @@ class MainFragment : BrowseSupportFragment() {
             rowViewHolder: RowPresenter.ViewHolder, row: Row
         ) {
             if (item is TVViewModel) {
-                tvListViewModel.setItemPositionCurrent(item.id.value!!)
+                tvListViewModel.setItemPositionCurrent(item.getTV().id)
                 (activity as MainActivity).mainActive()
             }
         }
     }
 
     fun check(tvViewModel: TVViewModel): Boolean {
-        val title = tvViewModel.title.value
+        val title = tvViewModel.getTV().title
         val videoUrl = tvViewModel.videoIndex.value?.let { tvViewModel.videoUrl.value?.get(it) }
         if (videoUrl == null || videoUrl == "") {
             Log.e(TAG, "$title videoUrl is empty")
@@ -235,8 +257,11 @@ class MainFragment : BrowseSupportFragment() {
     }
 
     fun fragmentReady() {
-//            request.fetchPage()
         tvListViewModel.getTVViewModel(itemPosition)?.changed()
+
+        tvListViewModel.tvListViewModel.value?.forEach { tvViewModel ->
+            updateEPG(tvViewModel)
+        }
     }
 
     fun play(itemPosition: Int) {
@@ -274,10 +299,18 @@ class MainFragment : BrowseSupportFragment() {
     }
 
     private fun updateEPG(tvViewModel: TVViewModel) {
-        if (tvViewModel.getTV().channel == "港澳台") {
-            Request.fetchFEPG(tvViewModel)
-        } else {
-            Request.fetchYEPG(tvViewModel)
+        when (tvViewModel.getTV().programType) {
+            ProgramType.Y_PROTO -> {
+                Request.fetchYProtoEPG(tvViewModel)
+            }
+
+            ProgramType.Y_JCE -> {
+                Request.fetchYJceEPG(tvViewModel)
+            }
+
+            ProgramType.F -> {
+                Request.fetchFEPG(tvViewModel)
+            }
         }
     }
 

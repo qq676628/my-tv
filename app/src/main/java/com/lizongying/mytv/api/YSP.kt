@@ -2,7 +2,6 @@ package com.lizongying.mytv.api
 
 import android.content.Context
 import com.lizongying.mytv.Encryptor
-import com.lizongying.mytv.MainActivity
 import com.lizongying.mytv.SP
 import com.lizongying.mytv.Utils.getDateTimestamp
 import com.lizongying.mytv.models.TVViewModel
@@ -63,8 +62,8 @@ object YSP {
     }
 
     fun switch(tvModel: TVViewModel): String {
-        livepid = tvModel.pid.value!!
-        cnlid = tvModel.sid.value!!
+        livepid = tvModel.getTV().pid
+        cnlid = tvModel.getTV().sid
         defn = "fhd"
 
         randStr = getRand()
@@ -82,7 +81,7 @@ object YSP {
     }
 
     fun getAuthData(tvModel: TVViewModel): String {
-        livepid = tvModel.pid.value!!
+        livepid = tvModel.getTV().pid
 
         randStr = getRand()
 
